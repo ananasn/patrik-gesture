@@ -1,5 +1,6 @@
 # hypercorn main:app --bind 0.0.0.0:8005
 import os
+import sys
 import cv2
 import json
 import time
@@ -41,7 +42,7 @@ log_file = RotatingFileHandler(
     maxBytes=32768, 
     backupCount=16
 )
-log_console = logging.StreamHandler()
+log_console = logging.StreamHandler(sys.stdout)
 
 logging.basicConfig(
     handlers=(log_file, log_console), 
@@ -68,16 +69,15 @@ def compare_triggers(gesture):
     )
 
     triggers = []
-    while True:
-        if response.status_code == 200:
-            triggers = response.json()
-            break
+    
+    if response.status_code == 200:
+        triggers = response.json()
     
     for trigger in triggers:
         trigger_id = trigger['id']
         # Не знаю, что писать сюда, у меня есть лэндмарки и названия жестов,
         # пишу как будто сравниваю полученное название с названием из триггера.
-        known_gesture = trigger.get('gesture_landmarks')
+        known_gesture = trigger.get('gesture')
         
         if gesture == known_gesture:
             logging.info(f'Trigger {trigger_id} fired.')
@@ -150,8 +150,7 @@ async def bg_worker():
                     gesture = recognition_result_list[0].gestures[0]
                     landmarks = recognition_result_list[0].hand_landmarks
                     category_name = gesture[0].category_name
-
-                    if category_name not in ("None", last_recognized["gesture"]):
+                    if category_name not in ("None",):
                         try:
                             compare_triggers(category_name)
                         except (
@@ -169,7 +168,6 @@ async def bg_worker():
                         last_recognized["image"] = img_b64
                         last_recognized["gesture"] = category_name
                         last_recognized["landmarks"] = landmarks
-
                         if app.fifo_queue.full():
                             await app.fifo_queue.get()
                         if app.fifo_queue.empty():
